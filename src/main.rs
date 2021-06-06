@@ -66,13 +66,13 @@ fn user_puzzle_choice() -> String {
         .read_line(&mut input)
         .expect("Failed to parse input.");
     match input.trim().parse::<usize>().unwrap() {
-        1 => "./puzzles/nono1.txt".to_string(),
-        2 => "./puzzles/nono2.txt".to_string(),
-        3 => "./puzzles/nono3.txt".to_string(),
-        4 => "./puzzles/nono4.txt".to_string(),
-        5 => "./puzzles/nono5.txt".to_string(),
-        6 => "./puzzles/nono6.txt".to_string(),
-        7 => "./puzzles/nono7.txt".to_string(),
+        1 => "./src/puzzles/nono1.txt".to_string(),
+        2 => "./src/puzzles/nono2.txt".to_string(),
+        3 => "./src/puzzles/nono3.txt".to_string(),
+        4 => "./src/puzzles/nono4.txt".to_string(),
+        5 => "./src/puzzles/nono5.txt".to_string(),
+        6 => "./src/puzzles/nono6.txt".to_string(),
+        7 => "./src/puzzles/nono7.txt".to_string(),
         _ => panic!("Invalid input"),
     }
 }
