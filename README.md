@@ -1,7 +1,7 @@
 # Paint by Numbers Solver
 Project members: Elena Kuznetsov
 
-A rust implementation of a picross solver for CS410. 
+A rust implementation of a Paint By Numbers solver for CS410. 
 Paint by Numbers: picture logic puzzles in which cells in a grid must be colored or left blank according to numbers at the side of the grid to reveal a hidden picture.
 The goal of this project was to create a solver that quickly finds solutions for any given paint by numbers puzzle, this is achieved by providing the puzzle related information (numbers at the side of the grid) in a separate text file, which is then read, and printed in the terminal if a solution exists. 
 The format for the text file: 
