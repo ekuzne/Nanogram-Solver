@@ -11,6 +11,6 @@ The format for the text file:
 
 This project is built and ran with "cargo build" in the root of the project (one level above /src/), which then allows the user to select one of the 7 available puzzles.
 Example (puzzle #1):
-![plot](./readme_img/example.jpg)
+![plot](./readme_img/example.JPG)
 
 Overall, this code works well for medium sized puzzles (30 by 30), but puzzles any larger than that begin taking a large amount of time to solve, such as puzzle #8 which takes so long to resolve that I gave up after waiting an hour. There are many optimizations that can be implemented with more time, and additional features that I wasn't able to get around to, such as colored puzzles rather than just b&w, and the ability to link any Paint by Numbers puzzle with a URL.  
