@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{self, stdout, BufRead, BufReader, Write};
 use termion::color;
 use termion::raw::IntoRawMode;
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Status {
     Empty,
     Marked,
@@ -43,6 +43,7 @@ fn main() {
     let mut vkey_max: usize = 0;
     let mut hkey_max: usize = 0;
     let file: String = user_puzzle_choice();
+    println!("Working...");
 
     b.read_nonogram(file).expect("Could not read file");
 
@@ -51,13 +52,14 @@ fn main() {
         return;
     }
 
-    let mut stdout = stdout().into_raw_mode().unwrap();
+    let stdout = stdout().into_raw_mode().unwrap();
 
     b.get_key_dimensions(&mut vkey_max, &mut hkey_max);
-    print_keys(&b, hkey_max, vkey_max, &mut stdout);
-    find_solution(b, vkey_max, hkey_max, stdout);
-}
 
+    if !find_solution(b, vkey_max, hkey_max, stdout) {
+        println!("Could not find solution");
+    }
+}
 //user chooses the nonogram they want to solve
 fn user_puzzle_choice() -> String {
     println!("Choose a puzzle (1-7): ");
@@ -130,7 +132,7 @@ fn init(board: &Board) -> bool {
 //solves the given puzzle using deductive methods until no more deductions are possible
 //once deductive reasoning cannot be used, make a guess, check whether the guess makes for a valid solution
 //if valid, keep using deduction, otherwise, pop from the stack and make another guess
-fn find_solution<W: Write>(mut b: Board, vkey_max: usize, hkey_max: usize, mut stdout: W) {
+fn find_solution<W: Write>(mut b: Board, vkey_max: usize, hkey_max: usize, mut stdout: W) -> bool {
     b.size.swap(0, 1);
     b.solve();
     let mut grid = Vec::new();
@@ -147,7 +149,7 @@ fn find_solution<W: Write>(mut b: Board, vkey_max: usize, hkey_max: usize, mut s
         if a_grid.complete_grid() {
             a_grid.update_board(&mut stdout, &vkey_max, &hkey_max);
             stdout.flush().unwrap();
-            return;
+            return true;
         }
         if let Some((_, Status::Marked)) = guess.last().unwrap() {
             grid.pop();
@@ -175,10 +177,10 @@ fn find_solution<W: Write>(mut b: Board, vkey_max: usize, hkey_max: usize, mut s
             guess.push(None);
         }
     }
-    println!("No Solution");
+    false
 }
 impl Board {
-    //returns true if all the cells in the grid are set to either marked or empty
+    ///Returns true if all the cells in the grid are set to either marked or empty
     fn complete_grid(&self) -> bool {
         for i in 0..self.size[0] {
             for j in 0..self.size[1] {
@@ -189,7 +191,7 @@ impl Board {
         }
         true
     }
-    
+
     //read the nonogram in the given file
     pub fn read_nonogram(&mut self, file: String) -> std::io::Result<()> {
         let mut size = Vec::<usize>::new();
@@ -329,7 +331,7 @@ impl Board {
     }
 
     //Set cells to marked if a given bound has definite marked cells within it.
-    //If the bound indicates that the entire key has been marked, mark the bounds as empty. 
+    //If the bound indicates that the entire key has been marked, mark the bounds as empty.
     fn definite_within_bounds_v(&mut self) -> bool {
         let height = self.v_keys.len();
         let width = self.h_keys.len();
@@ -476,7 +478,7 @@ impl Board {
         }
         progress
     }
-    
+
     //Marks spaces between keys in a key set if their bounds don't intersect
     fn determine_spaces_between_keys_v(&mut self) -> bool {
         let height = self.v_keys.len();
@@ -690,14 +692,14 @@ impl Board {
         }
         progress
     }
-    
+
     //Return true if the pattern in keys matches the pattern in compare_to
     fn compare_keys_start(&self, keys: &[usize], compare_to: &[NonoKey]) -> bool {
         let len = keys.len();
         if keys.len() > compare_to.len() {
             return false;
         }
-        
+
         for i in 0..len {
             if keys[i] != compare_to[i].value {
                 return false;
@@ -705,7 +707,7 @@ impl Board {
         }
         true
     }
-    //Return true if both vectors match each other entirely 
+    //Return true if both vectors match each other entirely
     fn compare_keys_whole(&self, keys: &[usize], compare_to: &[NonoKey]) -> bool {
         if keys.len() != compare_to.len() {
             return false;
@@ -719,7 +721,7 @@ impl Board {
         true
     }
 
-    //Return false if a row/column consists of cells that don't correspond with the appropriate key set 
+    //Return false if a row/column consists of cells that don't correspond with the appropriate key set
     fn valid_grid(&self) -> bool {
         let height = self.v_keys.len();
         let width = self.h_keys.len();
@@ -817,6 +819,7 @@ impl Board {
 
     //Prints the complete grid in the terminal
     fn update_board<W: Write>(&self, stdout: &mut W, vkey_max: &usize, hkey_max: &usize) {
+        print_keys(&self, *hkey_max, *vkey_max, stdout);
         for (i, cell_set) in self.grid.iter().enumerate() {
             for (j, cell) in cell_set.iter().enumerate() {
                 write!(
@@ -882,4 +885,486 @@ impl Board {
 
         stdout.flush().unwrap();
     }
+}
+
+#[test]
+fn complete_grid() {
+    let mut b: Board = Default::default();
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Marked
+            };
+            10
+        ];
+        10
+    ];
+    b.size = vec![10, 10];
+    let result = b.complete_grid();
+    assert_eq!(result, true);
+}
+#[test]
+fn incomplete_grid() {
+    let mut b: Board = Default::default();
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Marked
+            };
+            10
+        ];
+        10
+    ];
+    b.grid[0][9].cell_state = Status::Unknown;
+    b.size = vec![10, 10];
+    let result = b.complete_grid();
+    assert_eq!(result, false);
+}
+#[test]
+fn max_2d_vector() {
+    let mut b: Board = Default::default();
+    let mut v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 1,
+            upper_bound: 0,
+            lower_bound: 0
+        };
+        1
+    ];
+    b.h_keys.push(v);
+    v = vec![
+        NonoKey {
+            value: 1,
+            upper_bound: 0,
+            lower_bound: 0
+        };
+        5
+    ];
+    b.h_keys.push(v);
+
+    v = vec![
+        NonoKey {
+            value: 1,
+            upper_bound: 0,
+            lower_bound: 0
+        };
+        3
+    ];
+    b.v_keys.push(v);
+    v = vec![
+        NonoKey {
+            value: 1,
+            upper_bound: 0,
+            lower_bound: 0
+        };
+        7
+    ];
+    b.v_keys.push(v);
+    v = vec![
+        NonoKey {
+            value: 1,
+            upper_bound: 0,
+            lower_bound: 0
+        };
+        1
+    ];
+    b.v_keys.push(v);
+
+    let mut hmax = 0;
+    let mut vmax = 0;
+
+    b.get_key_dimensions(&mut vmax, &mut hmax);
+    assert_eq!(vmax, 7);
+    assert_eq!(hmax, 5);
+}
+#[test]
+fn valid_bounds() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 4,
+            upper_bound: 0,
+            lower_bound: 0,
+        },
+        NonoKey {
+            value: 7,
+            upper_bound: 0,
+            lower_bound: 0,
+        },
+    ];
+    b.v_keys.push(v);
+    let v2 = vec![
+        vec![
+            NonoKey {
+                value: 1,
+                upper_bound: 0,
+                lower_bound: 0
+            };
+            1
+        ];
+        15
+    ];
+    b.h_keys = v2;
+    b.size = vec![15, 1];
+    b.determine_bounds_v();
+    b.determine_bounds_h();
+    assert_eq!(b.v_keys[0][0].upper_bound, 0);
+    assert_eq!(b.v_keys[0][0].lower_bound, 7);
+    assert_eq!(b.v_keys[0][1].upper_bound, 5);
+    assert_eq!(b.v_keys[0][1].lower_bound, 15);
+}
+#[test]
+fn marked_bounds() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 4,
+            upper_bound: 0,
+            lower_bound: 0,
+        },
+        NonoKey {
+            value: 7,
+            upper_bound: 0,
+            lower_bound: 0,
+        },
+    ];
+    b.v_keys.push(v);
+    let v2 = vec![
+        vec![
+            NonoKey {
+                value: 1,
+                upper_bound: 0,
+                lower_bound: 0
+            };
+            1
+        ];
+        15
+    ];
+    b.h_keys = v2;
+    b.size = vec![1, 15];
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Unknown
+            };
+            15
+        ];
+        1
+    ];
+    b.determine_bounds_v();
+    b.determine_bounds_h();
+    b.definite_within_bounds_v();
+    b.definite_within_bounds_h();
+    assert_eq!(b.grid[0][3].cell_state, Status::Marked); //15 - 7 - 1 - 4 overlaps with -1+4
+    assert_eq!(b.grid[0][8].cell_state, Status::Marked); //the key "7" definitely exists within the bounds -1+4+1+7 through 15 - 7  (8 through 11)
+    assert_eq!(b.grid[0][9].cell_state, Status::Marked);
+    assert_eq!(b.grid[0][10].cell_state, Status::Marked);
+    assert_eq!(b.grid[0][11].cell_state, Status::Marked);
+}
+
+#[test]
+fn marked_and_separated_bounds() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 2,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 3,
+            upper_bound: 7,
+            lower_bound: 14,
+        },
+    ];
+    b.v_keys.push(v);
+    let v2 = vec![
+        vec![
+            NonoKey {
+                value: 0,
+                upper_bound: 0,
+                lower_bound: 0
+            };
+            1
+        ];
+        15
+    ];
+    b.h_keys = v2;
+    b.h_keys[1][0].value = 1;
+    b.h_keys[2][0].value = 1;
+    b.h_keys[10][0].value = 1;
+    b.h_keys[11][0].value = 1;
+    b.h_keys[12][0].value = 1;
+    b.size = vec![1, 15];
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Unknown
+            };
+            15
+        ];
+        1
+    ];
+    b.grid[0][6].cell_state = Status::Empty;
+    b.grid[0][1].cell_state = Status::Marked;
+    b.grid[0][11].cell_state = Status::Marked;
+    b.determine_bounds_v();
+    b.determine_bounds_h();
+    b.definite_within_bounds_v();
+    b.definite_within_bounds_h();
+    b.tighten_bounds_v();
+    b.tighten_bounds_h();
+    b.determine_spaces_between_keys_v();
+    b.determine_spaces_between_keys_h();
+    assert_eq!(b.grid[0][1].cell_state, Status::Marked);
+    assert_eq!(b.grid[0][2].cell_state, Status::Marked);
+    assert_eq!(b.grid[0][3].cell_state, Status::Empty);
+    assert_eq!(b.grid[0][4].cell_state, Status::Empty);
+    assert_eq!(b.grid[0][5].cell_state, Status::Empty);
+    assert_eq!(b.grid[0][6].cell_state, Status::Empty);
+    assert_eq!(b.grid[0][7].cell_state, Status::Empty);
+    assert_eq!(b.grid[0][8].cell_state, Status::Empty);
+    assert_eq!(b.grid[0][10].cell_state, Status::Marked);
+    assert_eq!(b.grid[0][11].cell_state, Status::Marked);
+    assert_eq!(b.grid[0][12].cell_state, Status::Marked);
+
+    assert_eq!(b.grid[0][0].cell_state, Status::Unknown);
+    assert_eq!(b.grid[0][13].cell_state, Status::Unknown);
+    assert_eq!(b.grid[0][14].cell_state, Status::Unknown);
+}
+
+#[test]
+fn whole_key_comparison() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 2,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 3,
+            upper_bound: 7,
+            lower_bound: 14,
+        },
+        NonoKey {
+            value: 4,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 5,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+    ];
+    b.v_keys.push(v);
+    let keys = vec![2, 3, 4, 5];
+    assert_eq!(b.compare_keys_whole(&keys, &b.v_keys[0]), true);
+}
+#[test]
+fn partial_key_comparison() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 2,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 3,
+            upper_bound: 7,
+            lower_bound: 14,
+        },
+        NonoKey {
+            value: 4,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 5,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+    ];
+    b.v_keys.push(v);
+    let keys = vec![2, 3];
+    assert_eq!(b.compare_keys_start(&keys, &b.v_keys[0]), true);
+}
+
+#[test]
+fn valid_combination() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 2,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 3,
+            upper_bound: 7,
+            lower_bound: 14,
+        },
+    ];
+    b.v_keys.push(v);
+    let v2 = vec![
+        vec![
+            NonoKey {
+                value: 0,
+                upper_bound: 0,
+                lower_bound: 0
+            };
+            1
+        ];
+        15
+    ];
+    b.h_keys = v2;
+    b.h_keys[1][0].value = 1;
+    b.h_keys[2][0].value = 1;
+    b.h_keys[10][0].value = 1;
+    b.h_keys[11][0].value = 1;
+    b.h_keys[12][0].value = 1;
+    b.size = vec![1, 15];
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Unknown
+            };
+            15
+        ];
+        1
+    ];
+    b.grid[0][6].cell_state = Status::Empty;
+    b.grid[0][1].cell_state = Status::Marked;
+    b.grid[0][11].cell_state = Status::Marked;
+    b.determine_bounds_v();
+    b.determine_bounds_h();
+    b.definite_within_bounds_v();
+    b.definite_within_bounds_h();
+    b.tighten_bounds_v();
+    b.tighten_bounds_h();
+    b.determine_spaces_between_keys_v();
+    b.determine_spaces_between_keys_h();
+    assert_eq!(b.valid_grid(), true);
+}
+
+#[test]
+fn not_valid_combination() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 2,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 3,
+            upper_bound: 7,
+            lower_bound: 14,
+        },
+    ];
+    b.v_keys.push(v);
+    let v2 = vec![
+        vec![
+            NonoKey {
+                value: 0,
+                upper_bound: 0,
+                lower_bound: 0
+            };
+            1
+        ];
+        15
+    ];
+    b.h_keys = v2;
+    b.h_keys[1][0].value = 1;
+    b.h_keys[2][0].value = 1;
+    b.h_keys[10][0].value = 1;
+    b.h_keys[11][0].value = 1;
+    b.h_keys[12][0].value = 1;
+    b.size = vec![1, 15];
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Unknown
+            };
+            15
+        ];
+        1
+    ];
+    b.grid[0][6].cell_state = Status::Empty;
+    b.grid[0][1].cell_state = Status::Marked;
+    b.grid[0][11].cell_state = Status::Marked;
+
+    b.grid[0][14].cell_state = Status::Marked;
+
+    b.determine_bounds_v();
+    b.determine_bounds_h();
+    b.definite_within_bounds_v();
+    b.definite_within_bounds_h();
+    b.tighten_bounds_v();
+    b.tighten_bounds_h();
+    b.determine_spaces_between_keys_v();
+    b.determine_spaces_between_keys_h();
+    assert_eq!(b.valid_grid(), false);
+}
+
+#[test]
+fn unknown_cell_test() {
+    let mut b: Board = Default::default();
+    let v: Vec<NonoKey> = vec![
+        NonoKey {
+            value: 2,
+            upper_bound: 0,
+            lower_bound: 5,
+        },
+        NonoKey {
+            value: 3,
+            upper_bound: 7,
+            lower_bound: 14,
+        },
+    ];
+    b.v_keys.push(v);
+    let v2 = vec![
+        vec![
+            NonoKey {
+                value: 0,
+                upper_bound: 0,
+                lower_bound: 0
+            };
+            1
+        ];
+        15
+    ];
+    b.h_keys = v2;
+    b.h_keys[1][0].value = 1;
+    b.h_keys[2][0].value = 1;
+    b.h_keys[10][0].value = 1;
+    b.h_keys[11][0].value = 1;
+    b.h_keys[12][0].value = 1;
+    b.size = vec![1, 15];
+    b.grid = vec![
+        vec![
+            Point {
+                cell_state: Status::Unknown
+            };
+            15
+        ];
+        1
+    ];
+    b.grid[0][6].cell_state = Status::Empty;
+    b.grid[0][1].cell_state = Status::Marked;
+    b.grid[0][11].cell_state = Status::Marked;
+    b.grid[0][0].cell_state = Status::Empty;
+    b.grid[0][14].cell_state = Status::Empty;
+    b.determine_bounds_v();
+    b.determine_bounds_h();
+    b.definite_within_bounds_v();
+    b.definite_within_bounds_h();
+    b.tighten_bounds_v();
+    b.tighten_bounds_h();
+    b.determine_spaces_between_keys_v();
+    b.determine_spaces_between_keys_h();
+    let (i, j) = b.get_unknown_cell();
+    assert_eq!(b.grid[i][j].cell_state, Status::Unknown);
 }
