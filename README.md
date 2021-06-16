@@ -1,5 +1,4 @@
 # Paint By Numbers Solver
-Project members: Elena Kuznetsov
 
 A rust implementation of a Paint By Numbers solver for CS410.
 ## Description
